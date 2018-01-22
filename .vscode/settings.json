@@ -1,0 +1,37 @@
+{
+    "python.unitTest.pyTestArgs": [
+        "."
+    ],
+    "python.unitTest.pyTestEnabled": true,
+    // deploy setting
+    "deploy": {
+        "packages": [
+            {
+                "name": "RODC",
+                "files": [
+                    "**/*.py"
+                ],
+                "deployOnChange": {
+                    "files": [
+                        "**/*.py"
+                    ],
+                    "useTargetList": false
+                },
+                "targets":[
+                    "scg2"
+                ]
+            }
+        ],
+        "targets": [
+            {
+                "type": "sftp",
+                "name": "scg2",
+                "dir": "/home/mike2ox/RODC",
+                "host": "192.168.100.2",
+                "port": 22,
+                "user": "mike2ox",
+                "password": "faking01"
+            }
+        ]
+    }
+}
