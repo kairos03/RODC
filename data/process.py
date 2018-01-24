@@ -30,6 +30,19 @@ def make_image_train_dataset(path=IMAGE_TRAIN_DATASET_PATH):
     imgs = np.asarray(imgs)
     assert imgs.shape[0] == 900
 
+    # image crop 
+    imgs = imgs[:, 0:470, 120:590, :]
+    print(imgs.shape)
+
+    # image resize
+    resize = []
+    for i in range(imgs.shape[0]):
+        img = misc.imresize(imgs[i,:,:,:], (320, 320))
+        resize.append(img)
+    resize = np.stack(resize)
+    print(resize.shape)
+    assert resize.shape == (900, 320, 320, 3)
+
     # make labels
     zero = np.zeros((450, 1))
     one = np.ones((450, 1))
@@ -42,7 +55,7 @@ def make_image_train_dataset(path=IMAGE_TRAIN_DATASET_PATH):
 
     # save
     with h5py.File(path, 'w') as hf:
-        hf.create_dataset("images", data=imgs, compression="gzip", compression_opts=5)
+        hf.create_dataset("images", data=resize, compression="gzip", compression_opts=5)
         hf.create_dataset("labels", data=labels, compression="gzip", compression_opts=5)
     print("SAVED", path)
 

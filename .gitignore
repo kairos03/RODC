@@ -3,6 +3,9 @@
 **/*.pkl
 **/*.zip
 **/*.h5
+log/
+
+.vscode/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
