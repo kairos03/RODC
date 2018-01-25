@@ -11,7 +11,7 @@ import numpy as np
 from data import data_input
 from data import process
 
-import model
+import feature_model
 
 TOTAL_EPOCH = 100
 BATCH_SIZE = 50

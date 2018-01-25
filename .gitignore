@@ -3,6 +3,7 @@
 **/*.pkl
 **/*.zip
 **/*.h5
+**/*.xml
 log/
 
 .vscode/

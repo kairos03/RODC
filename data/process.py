@@ -5,14 +5,21 @@ Image data process (labeling)
 """
 import os
 
+import xml.etree.ElementTree as ET
+
 from scipy import misc
 import numpy as np
+import pandas as pd
 import h5py
 
 DATA_PATH = 'data/'
+
 PEPTIDE_PATH = DATA_PATH+'peptide/'
 PARTICLE_PATH = DATA_PATH+'particle/'
 IMAGE_TRAIN_DATASET_PATH = DATA_PATH + 'image_train.h5'
+
+DETACTION_OBJECTS_PATH = DATA_PATH + 'objects/'
+DETACTION_TRAIN_DATASET_PATH = DATA_PATH + 'detation_train.h5'
 
 def make_image_train_dataset(path=IMAGE_TRAIN_DATASET_PATH):
     imgs = []
@@ -30,8 +37,9 @@ def make_image_train_dataset(path=IMAGE_TRAIN_DATASET_PATH):
     imgs = np.asarray(imgs)
     assert imgs.shape[0] == 900
 
+    # TODO Move to model
     # image crop 
-    imgs = imgs[:, 0:470, 120:590, :]
+    imgs = imgs[:, 2:, 100:610, :] # 510, 510
     print(imgs.shape)
 
     # image resize
@@ -69,6 +77,62 @@ def load_image_train_dataset(path=IMAGE_TRAIN_DATASET_PATH):
     return images, labels
 
 
+def make_detacion_train_dataset(path=DETACTION_OBJECTS_PATH):
+    annotaion_path = 'Annotation/'
+    image_path = 'Image/'
+
+    dataset = pd.DataFrame(columns=['x', 'y', 'w', 'h', 'image', 'filename'])
+
+    for xml_path in os.listdir(DETACTION_OBJECTS_PATH+annotaion_path):
+        
+        # Annotaion XML parsing
+        tree = ET.parse(DETACTION_OBJECTS_PATH+annotaion_path+xml_path)
+        root = tree.getroot()
+
+        # extract img_filename and coord 
+        img_filename = root.find('filename').text
+        bndbox = root.find('object/bndbox')
+        xmin = int(bndbox.find('xmin').text)
+        ymin = int(bndbox.find('ymin').text)
+        xmax = int(bndbox.find('xmax').text)
+        ymax = int(bndbox.find('ymax').text)
+
+        size = root.find('size')
+        width = int(size.find('width').text)
+        height = int(size.find('height').text)
+
+        # calculate center x, center y, w, h
+        w = (xmax - xmin) 
+        h = (ymax - ymin)
+        x = (w/2) + xmin
+        y = (h/2) + ymin 
+
+        # range in [0, 1]
+        w = w/width
+        h = h/height
+        x = x/width
+        y = y/height
+
+        # read image
+        image = misc.imread(DETACTION_OBJECTS_PATH+image_path+img_filename)
+        
+        # append data
+        dataset = dataset.append({'x': x, 'y': y, 'w': w, 'h': h, 'image': image, 'filename': img_filename}, ignore_index=True)
+        
+    # save 
+    dataset.to_hdf(DETACTION_TRAIN_DATASET_PATH, 'detacion')
+    # print(dataset.head)
+    print("SAVED", DETACTION_TRAIN_DATASET_PATH)
+
+
+def load_detacion_train_dataset(path=DETACTION_TRAIN_DATASET_PATH):
+    df = pd.read_hdf(path)
+    print("LOADED", path, df.shape)
+    return df
+
 if __name__ == '__main__':
     make_image_train_dataset()
     load_image_train_dataset()
+
+    make_detacion_train_dataset()
+    load_detacion_train_dataset()
