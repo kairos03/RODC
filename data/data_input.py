@@ -7,9 +7,11 @@ from data import process
 
 
 class Dataset:
-    def __init__(self, batch_size, data, label, is_shuffle=False, is_valid=False):
-        self.data = data
-        self.label = label
+    def __init__(self, batch_size, data, label, seed=None, is_shuffle=False, is_valid=False):
+        self.data = data if data is None else []
+        self.label = label if label is None else []
+
+        self.seed = seed
 
         self.valid_data = None
         self.valid_label = None
@@ -27,7 +29,7 @@ class Dataset:
             self.data, self.valid_data, self.label, self.valid_label = train_test_split(self.data,
                                                                                         self.label,
                                                                                         test_size=0.33,
-                                                                                        random_state=486)
+                                                                                        random_state=self.seed)
 
             self.data_size = self.data.shape[0]
             self.valid_size = self.valid_data.shape[0]
@@ -35,7 +37,10 @@ class Dataset:
             self.total_batch = int(self.data_size / self.batch_size) + 1
             self.valid_total_batch = int(self.valid_size / self.batch_size) + 1
 
-    def next_batch(self, seed, valid_set=False):
+    def next_batch(self, seed=None, valid_set=False):
+        
+        if seed is None:
+            seed = self.seed
 
         if valid_set:
             data = self.valid_data
