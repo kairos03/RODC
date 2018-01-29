@@ -43,8 +43,10 @@ def train():
             y = tf.placeholder(tf.float32, [None, 2], name='y')
             keep_prob = tf.placeholder(tf.float32, name='keep_prob')
 
-        _, loss, optimizer, accuracy = model.make_model(
-            x, y, keep_prob, LEARNING_RATE)
+        inputs = {'image': x, 'labels': y, 'keep_prob': keep_prob}
+        hparam = {'learning_rate': LEARNING_RATE}
+
+        _, loss, optimizer, accuracy = feature_model.make_model(inputs, hparam)
 
         with tf.variable_scope('matrix'):
             tf.summary.scalar('loss', loss)

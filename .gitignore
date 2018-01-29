@@ -5,6 +5,7 @@
 **/*.h5
 **/*.xml
 log/
+**/*.pptx
 
 .vscode/
 
