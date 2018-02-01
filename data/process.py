@@ -159,7 +159,7 @@ def pre_process(image_names, path, size=256, interp='bilinear'):
     imgs = []
 
     for i, name in enumerate(image_names):
-        
+
         im = misc.imread(path[i] + name)
         im = misc.imresize(im, (size, size), interp=interp)
 
@@ -170,8 +170,8 @@ def pre_process(image_names, path, size=256, interp='bilinear'):
 
 def seg_pre_process(image_names):
 
-    x = pre_process(image_names, ORIGIN_PATH)
-    y = pre_process(image_names, ANNO_PATH, interp='nearest')
+    x = pre_process(image_names, [ORIGIN_PATH]*image_names.shape[0])
+    y = pre_process(image_names, [ANNO_PATH]*image_names.shape[0], size=64, interp='nearest')
 
     return x, y
 
