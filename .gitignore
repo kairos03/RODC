@@ -1,3 +1,14 @@
+# data
+**/*.jpg
+**/*.pkl
+**/*.zip
+**/*.h5
+**/*.xml
+log/
+**/*.pptx
+
+.vscode/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
