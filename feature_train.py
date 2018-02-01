@@ -16,7 +16,7 @@ import feature_model
 
 TOTAL_EPOCH = 100
 BATCH_SIZE = 50
-LEARNING_RATE = 1e-5
+LEARNING_RATE = 1e-4
 DROPOUT_RATE = 0.5
 RANDOM_SEED = np.random.randint(0, 1000)
 
@@ -26,9 +26,13 @@ LOG_TEST_PATH = 'log/' + str(CURRENT) + '/test/'
 MODEL_PATH = 'log/' + str(CURRENT) + '/model/'
 
 df = process.load_image_train_dataset()
-dataset = data_input.get_dataset(
-    BATCH_SIZE, df['filename'], df['class'], is_shuffle=True, is_valid=True)
 
+is_valid=False
+
+def to_dataset(df):
+    return data_input.get_dataset(BATCH_SIZE, df['filename'], df['class'], is_shuffle=True, is_valid=is_valid)
+
+dataset = to_dataset(df)
 
 def train():
     """
@@ -69,11 +73,11 @@ def train():
 
             for _ in range(total_batch):
 
-                x_s, y_s = dataset.next_batch(RANDOM_SEED, valid_set=True)
+                x_s, y_s = dataset.next_batch(RANDOM_SEED, valid_set=is_valid)
                 y_s = np.stack(y_s)
 
-                path = [filepath[:-11] for filepath in x_s] 
-                name = [filepath[-11:] for filepath in x_s] 
+                path = [filepath[:-11] for filepath in x_s]
+                name = [filepath[-11:] for filepath in x_s]
 
                 x_s = process.pre_process(name, path)
 
@@ -108,11 +112,11 @@ def test():
 
     print('-----  test start  -----')
 
-    x_s, y_s = dataset.next_batch(RANDOM_SEED, valid_set=True)
+    x_s, y_s = dataset.next_batch(RANDOM_SEED, valid_set=is_valid)
     y_s = np.stack(y_s)
 
-    path = [filepath[:-11] for filepath in x_s] 
-    name = [filepath[-11:] for filepath in x_s] 
+    path = [filepath[:-11] for filepath in x_s]
+    name = [filepath[-11:] for filepath in x_s]
 
     x_s = process.pre_process(name, path)
 
@@ -147,4 +151,4 @@ def test():
 
 if __name__ == '__main__':
     train()
-    test()
+    # test()
