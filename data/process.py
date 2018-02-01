@@ -4,6 +4,7 @@
 Image data process (labeling)
 """
 import os
+import pickle
 
 import xml.etree.ElementTree as ET
 
@@ -12,76 +13,62 @@ import numpy as np
 import pandas as pd
 import h5py
 
-DATA_PATH = 'data/'
+
+DATA_PATH = 'data/seg_data/'
+
+PARTICLE = [1.,0.,0.]
+PEPTIDE = [0.,1.,0.]
+BACKGROUND = [0.,0.,1.]
+
+input_shape = (256, 256)
+label_shape = (256, 256)
 
 PEPTIDE_PATH = DATA_PATH + 'peptide/'
 PARTICLE_PATH = DATA_PATH + 'particle/'
+BACKGROUND_PATH = DATA_PATH + 'background/'
 IMAGE_TRAIN_DATASET_PATH = DATA_PATH + 'image_train.h5'
 
 DETACTION_OBJECTS_PATH = DATA_PATH + 'objects/'
 DETACTION_TRAIN_DATASET_PATH = DATA_PATH + 'detation_train.h5'
 
+ORIGIN_PATH = DATA_PATH + 'image/'
+MASK_PATH = DATA_PATH + 'mask/'
+ANNO_PATH = DATA_PATH + 'anno/'
+FCN_TRAIN_DATASET_PATH = DATA_PATH + 'fcn_train.h5'
+
 
 def make_image_train_dataset(path=IMAGE_TRAIN_DATASET_PATH):
     """
     """
-    imgs = []
+    df = pd.DataFrame()
+    pep = os.listdir(PEPTIDE_PATH)
+    par = os.listdir(PARTICLE_PATH)
+    bag = os.listdir(BACKGROUND_PATH)
 
-    # load peptide images
-    for image_name in os.listdir(PEPTIDE_PATH):
-        image = misc.imread(PEPTIDE_PATH + image_name)
-        imgs.append(image)
-    assert len(imgs) == 450
+    # label to anno_img
+    for name in par:
+        df = df.append({'filename': PARTICLE_PATH + name, 'class': PARTICLE},
+                       ignore_index=True)
 
-    # load particle images
-    for image_name in os.listdir(PARTICLE_PATH):
-        image = misc.imread(PARTICLE_PATH + image_name)
-        imgs.append(image)
-    imgs = np.asarray(imgs)
-    assert imgs.shape[0] == 900
+    for name in pep:
+        df = df.append({'filename': PEPTIDE_PATH + name, 'class': PEPTIDE},
+                       ignore_index=True)
 
-    # TODO Move to model
-    # image crop
-    imgs = imgs[:, 2:, 100:610, :]  # 510, 510
-    print(imgs.shape)
-
-    # image resize
-    resize = []
-    for i in range(imgs.shape[0]):
-        img = misc.imresize(imgs[i, :, :, :], (320, 320))
-        resize.append(img)
-    resize = np.stack(resize)
-    print(resize.shape)
-    assert resize.shape == (900, 320, 320, 3)
-
-    # make labels
-    zero = np.zeros((450, 1))
-    one = np.ones((450, 1))
-    peptide_labels = np.concatenate([one, zero], axis=1)
-    particle_labels = np.concatenate([zero, one], axis=1)
-    labels = np.concatenate([peptide_labels, particle_labels])
-    assert labels.shape == (900, 2)
-    assert (labels[449] == np.array([1, 0])).all()
-    assert (labels[450] == np.array([0, 1])).all()
+    for name in bag:
+        df = df.append({'filename': BACKGROUND_PATH + name, 'class': BACKGROUND},
+                       ignore_index=True)
 
     # save
-    with h5py.File(path, 'w') as hf:
-        hf.create_dataset("images", data=resize,
-                          compression="gzip", compression_opts=5)
-        hf.create_dataset("labels", data=labels,
-                          compression="gzip", compression_opts=5)
-    print("SAVED", path)
+    df.to_hdf(path, 'feature')
+    print("SAVED", path, df.shape)
 
 
 def load_image_train_dataset(path=IMAGE_TRAIN_DATASET_PATH):
     """
     """
-    with h5py.File(path, 'r') as hf:
-        images = hf.get("images")[:]
-        labels = hf.get("labels")[:]
-    print("LOADED", path, images.shape, labels.shape)
-
-    return images, labels
+    df = pd.read_hdf(path)
+    print("LOADED", path, df.shape)
+    return df
 
 
 def make_detacion_train_dataset(path=DETACTION_OBJECTS_PATH):
@@ -131,9 +118,70 @@ def load_detacion_train_dataset(path=DETACTION_TRAIN_DATASET_PATH):
     return df
 
 
+def image_to_anno(img, width=256, height=256):
+
+    mask = (img == np.reshape(np.amax(img, 2), (width, height, 1))).astype(float)
+
+    for i in range(width):
+        for j in range(height):
+            if (mask[i, j] == [1., 1., 1.]).all():
+                mask[i, j] = [0., 0., 1.]
+
+    return mask
+
+
+def make_fcn_train_dataset(path=FCN_TRAIN_DATASET_PATH):
+    df = pd.DataFrame()
+    filenames = np.array(os.listdir(ORIGIN_PATH))
+    df['filename'] = filenames
+
+    # label to anno_img
+    for name in filenames:
+        img = misc.imread(MASK_PATH + name)
+        img = misc.imresize(img, (256, 256))
+        img = image_to_anno(img)
+        misc.imsave(ANNO_PATH + name, img)
+
+    # save
+    df.to_hdf(path, 'detacion')
+    print("SAVED", path, df.shape)
+
+
+def load_fcn_train_dataset(path=FCN_TRAIN_DATASET_PATH):
+    """
+    """
+    df = pd.read_hdf(path)
+    print("LOADED", path, df.shape)
+    return df
+
+
+def pre_process(image_names, path, size=256, interp='bilinear'):
+    imgs = []
+
+    for i, name in enumerate(image_names):
+        
+        im = misc.imread(path[i] + name)
+        im = misc.imresize(im, (size, size), interp=interp)
+
+        imgs.append(im)
+
+    return np.stack(imgs)
+
+
+def seg_pre_process(image_names):
+
+    x = pre_process(image_names, ORIGIN_PATH)
+    y = pre_process(image_names, ANNO_PATH, interp='nearest')
+
+    return x, y
+
+
 if __name__ == '__main__':
     make_image_train_dataset()
     load_image_train_dataset()
 
-    make_detacion_train_dataset()
-    load_detacion_train_dataset()
+    # make_detacion_train_dataset()
+    # load_detacion_train_dataset()
+
+    make_fcn_train_dataset()
+    load_fcn_train_dataset()

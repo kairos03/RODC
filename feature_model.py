@@ -22,7 +22,7 @@ def make_model(inputs, hparam):
                              activation=tf.nn.relu)
     pool1 = tf.layers.max_pooling2d(conv1, (2, 2),
                                     strides=(2, 2),
-                                    padding='same')
+                                    padding='same', name='pool1')
 
     conv2 = tf.layers.conv2d(pool1, 256, (1, 1),
                              strides=(1, 1),
@@ -34,7 +34,7 @@ def make_model(inputs, hparam):
                              activation=tf.nn.relu)
     pool2 = tf.layers.max_pooling2d(conv3, (2, 2),
                                     strides=(2, 2),
-                                    padding='same')
+                                    padding='same', name='pool2')
 
     conv4 = tf.layers.conv2d(pool2, 512, (1, 1),
                              strides=(1, 1),
@@ -46,7 +46,7 @@ def make_model(inputs, hparam):
                              activation=tf.nn.relu)
     pool3 = tf.layers.max_pooling2d(conv5, (2, 2),
                                     strides=(2, 2),
-                                    padding='same')
+                                    padding='same', name='pool3')
     print(image.shape)
     print(pool1.shape)
     print(pool2.shape)
@@ -54,12 +54,12 @@ def make_model(inputs, hparam):
 
     feature_extraction = tf.identity(pool3, name='feature_extraction')
 
-    reshape = tf.reshape(pool3, (-1, 10 * 10 * 1024))
+    reshape = tf.reshape(pool3, (-1, 8 * 8 * 1024))
 
     dense1 = tf.layers.dense(reshape, 1024, activation=tf.nn.relu)
     drop = tf.layers.dropout(dense1, rate=keep_prob)
 
-    output = tf.layers.dense(drop, 2)
+    output = tf.layers.dense(drop, 3)
 
     print(dense1.shape)
     print(output.shape)

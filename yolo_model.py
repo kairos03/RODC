@@ -17,6 +17,9 @@ sconf = 1
 snoob = .5
 scoor = 5
 
+# feature model path
+FEATURE_MODEL_PATH = 'log/feature_model/'
+
 def leaky_relu(x, alpha=0.1):
     """
     leaky relu
@@ -24,7 +27,7 @@ def leaky_relu(x, alpha=0.1):
     return tf.nn.relu(x) - alpha * tf.nn.relu(-x)
 
 
-def loss(logits, labels):
+def yolo_loss(logits=None, labels=None):
     """
     yolo loss
     """
@@ -94,10 +97,10 @@ def make_model(inputs, hparam):
 
     # inputs
     images = inputs['images']
-    #...
+    labels = inputs['labels']
 
     # hparam
-    # ...
+    learning_rate = hparam['learning_rate']
 
     # feature model load
 
@@ -122,4 +125,9 @@ def make_model(inputs, hparam):
     output = tf.layers.dense(conn1, (-1, SS * ((5 * B) + C)), 
                              activation=leaky_relu)
 
-
+    with tf.name_scope('matrix'):
+        loss = yolo_loss(logits=output, labels=labels)
+        tf.summary.scalar('loss', loss)
+        optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
+    
+    return output, loss, optimizer

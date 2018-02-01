@@ -8,8 +8,10 @@ from data import process
 
 class Dataset:
     def __init__(self, batch_size, data, label, seed=None, is_shuffle=False, is_valid=False):
-        self.data = data if data is None else []
-        self.label = label if label is None else []
+        self.data = data
+        self.data = np.array(self.data)
+        self.label = label if label is not None else np.zeros(data.shape)
+        self.label = np.array(self.label)
 
         self.seed = seed
 
@@ -87,10 +89,11 @@ if __name__ == '__main__':
     # deprecated
     # x, y, idx = load_data()
 
-    x, y = process.load_image_train_dataset()
+    # x, y = process.load_image_train_dataset()
+    df = process.load_fcn_train_dataset()
     RANDOM_SEED = 128
 
-    dd = get_dataset(500, x, y, is_shuffle=False, is_valid=True)
+    dd = get_dataset(10, df['filename'], None, is_shuffle=False, is_valid=True)
 
     print(dd.valid_data.shape)
     print(dd.data.shape)
