@@ -168,9 +168,23 @@ def pre_process(image_names, path, size=256, interp='bilinear'):
     return np.stack(imgs)
 
 
+def remove_background(image, background):
+    imgs = []
+    for x in image:
+        diff = np.abs(background - x)
+        diff  = ((diff > 50) * 255.).astype(np.int8)
+        imgs.append(diff)
+    return np.stack(imgs)
+    
+
+
 def seg_pre_process(image_names):
 
     x = pre_process(image_names, [ORIGIN_PATH]*image_names.shape[0])
+    clean_img = misc.imread('data/seg_data/background/0000112.jpg')
+    clean_img = misc.imresize(clean_img, (256,256))
+    x = remove_background(x, clean_img)
+
     y = pre_process(image_names, [ANNO_PATH]*image_names.shape[0], size=64, interp='nearest')
 
     return x, y

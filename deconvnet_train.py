@@ -10,10 +10,9 @@ from data import data_input
 from data import process
 from data.process import seg_pre_process
 
-
 TOTAL_EPOCH = 3000
 BATCH_SIZE = 50
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 1e-4
 DROPOUT_RATE = 0.9
 RANDOM_SEED = np.random.randint(0, 1000)
 
@@ -78,96 +77,77 @@ def train():
 
     print('-----  training start  -----')
 
-    frozen_graph = 'log/1517567622.9337113/model/-100.pb'
-    with tf.gfile.GFile(frozen_graph, "rb") as f:
-        graph_def = tf.GraphDef()
-        graph_def.ParseFromString(f.read())
-
-    with tf.Graph().as_default() as feature_graph:
-        tf.import_graph_def(graph_def,
-                            input_map=None,
-                            return_elements=None,
-                            name=""
-                            )
+    with tf.Graph().as_default() as graph:
 
         # model
-        with tf.name_scope('fcn_input'):
-            x = feature_graph.get_tensor_by_name('input/x:0')
-            # y = feature_graph.get_tensor_by_name('input/y:0')
+        with tf.name_scope('input'):
+            x = tf.placeholder(tf.float32, [None, 256, 256, 3], name='x')
             z = tf.placeholder(tf.float32, [None, 64, 64, 3], name='z')
             keep_prob = tf.placeholder(tf.float16)
             b_y = tf.truediv(z, 255.)
-            # b_y = tf.arg_max(z)
 
             tf.summary.image('input', x, 1)
             tf.summary.image('label', b_y, 1)
 
+        with tf.variable_scope('convolution'):
+            conv = tf.layers.batch_normalization(x)
+            conv = tf.layers.conv2d(conv, 64, (3,3), strides=(1, 1), padding='same', activation=lrelu)
+            pool1 = tf.layers.max_pooling2d(conv, (2,2), (2,2), padding='same')
+
+            conv = tf.layers.batch_normalization(pool1)
+            conv = tf.layers.conv2d(conv, 128, (3,3), strides=(1, 1), padding='same', activation=lrelu)
+            pool2 = tf.layers.max_pooling2d(conv, (2,2), (2,2), padding='same')
+
+            conv = tf.layers.batch_normalization(pool2)
+            conv = tf.layers.conv2d(conv, 64, (1,1), strides=(1, 1), padding='same', activation=lrelu)
+            conv = tf.layers.conv2d(conv, 128, (3,3), strides=(1, 1), padding='same', activation=lrelu)
+            conv = tf.layers.conv2d(conv, 256, (3,3), strides=(1, 1), padding='same', activation=lrelu)
+            pool3 = tf.layers.max_pooling2d(conv, (2,2), (2,2), padding='same')
+
+            conv = tf.layers.batch_normalization(pool3)
+            conv = tf.layers.conv2d(conv, 128, (1,1), strides=(1, 1), padding='same', activation=lrelu)
+            conv = tf.layers.conv2d(conv, 256, (3,3), strides=(1, 1), padding='same', activation=lrelu)
+            conv = tf.layers.conv2d(conv, 512, (3,3), strides=(1, 1), padding='same', activation=lrelu)
+            pool4 = tf.layers.max_pooling2d(conv, (2,2), (2,2), padding='same')
+
+            conv = tf.layers.batch_normalization(pool4)
+            conv = tf.layers.conv2d(conv, 256, (1,1), strides=(1, 1), padding='same', activation=lrelu)
+            conv = tf.layers.conv2d(conv, 512, (3,3), strides=(1, 1), padding='same', activation=lrelu)
+            conv = tf.layers.conv2d(conv, 1024, (3,3), strides=(1, 1), padding='same', activation=lrelu)
+            pool5 = tf.layers.max_pooling2d(conv, (2,2), (2,2), padding='same')
+
+        with tf.variable_scope('deconvolution'):
+            up_sample4 = tf.layers.conv2d_transpose(pool5, 3, (3,3), strides=(2, 2), padding='same', activation=lrelu)
+            up_pool4 = tf.layers.conv2d(pool4, 3, (3,3), strides=(1, 1), padding='same', activation=lrelu)
+            fuse1 = tf.add(up_sample4, up_pool4)
             
+            up_sample3 = tf.layers.conv2d_transpose(fuse1, 3, (3,3), strides=(2, 2), padding='same', activation=lrelu)
+            up_pool3 = tf.layers.conv2d(pool3, 3, (3,3), strides=(1, 1), padding='same', activation=lrelu)
+            fuse2 = tf.add(up_sample3, up_pool3)
 
-            pool2 = feature_graph.get_tensor_by_name('pool2/MaxPool:0')
-            pool3 = feature_graph.get_tensor_by_name('pool3/MaxPool:0')
-            feature_output = feature_graph.get_tensor_by_name('pool4/MaxPool:0')
-            # pool2 = tf.stop_gradient(pool2)
-            # pool3 = tf.stop_gradient(pool3)
-            # feature_output = tf.stop_gradient(feature_output)
+            up_sample2 = tf.layers.conv2d_transpose(fuse2, 3, (3,3), strides=(2, 2), padding='same', activation=lrelu)
+            up_pool2 = tf.layers.conv2d(pool2, 3, (3,3), strides=(1, 1), padding='same', activation=lrelu)
+            fuse3 = tf.add(up_sample2, up_pool2)
 
-        with tf.variable_scope('fcn'):
-            conv5 = tf.layers.conv2d(feature_output, 2048, kernel_size=[
-                                    1, 1], padding='same', activation=lrelu)
-            drop1 = tf.layers.dropout(conv5, keep_prob)
-            conv6 = tf.layers.conv2d(drop1, 2048, kernel_size=[
-                                    1, 1], padding='same', activation=lrelu)
-            drop2 = tf.layers.dropout(conv6, keep_prob)
-            conv7 = tf.layers.conv2d(drop2, 1024, kernel_size=[
-                                    1, 1], padding='same', activation=lrelu)  # TODO
-
-        # deconv
-        # conv7 = tf.nn.tanh(conv7)
-        deconv1 = tf.layers.conv2d_transpose(conv7, 512, kernel_size=[3, 3], strides=[
-                                            2, 2], padding='same')
-        # bn = tf.layers.batch_normalization(deconv1)
-        act = lrelu(deconv1)
-        fuse1 = tf.add(act, pool3)
-
-        deconv2 = tf.layers.conv2d_transpose(fuse1, 256, kernel_size=[3, 3], strides=[
-                                            2, 2], padding='same')
-        # bn = tf.layers.batch_normalization(deconv2)
-        act = lrelu(deconv2)
-        fuse2 = tf.add(act, pool2)
-
-        deconv3 = tf.layers.conv2d_transpose(fuse2, 3, kernel_size=[3, 3], strides=[
-                                            2, 2], padding='same', name='')
-        # bn = tf.layers.batch_normalization(deconv3)
-        act = lrelu(deconv3)
-
-        output = tf.layers.conv2d_transpose(act, 3, kernel_size=[3, 3], strides=[
-                                            2, 2], padding='same', name='')
-        # output = tf.layers.batch_normalization(output)
-        output = lrelu(output)
-
-
+            output = fuse3
+            
         with tf.name_scope('output'):
-            # zero = np.zeros((1, 256, 256, 1))
-            # r = tf.concat([tf.reshape(output[0,:,:,0], (1,256,256,1)), zero, zero], axis=3)
-            # g = tf.concat([zero, tf.reshape(output[0,:,:,1], (1,256,256,1)), zero], axis=3)
-            # b = tf.concat([zero, zero, tf.reshape(output[0,:,:,2], (1,256,256,1))], axis=3)
-
+            tf.summary.image('up32', fuse1, 1)
+            tf.summary.image('up16', fuse2, 1)
             tf.summary.image('output', output, 1)
-            # tf.summary.image('r', r, 1)
-            # tf.summary.image('g', g, 1)
-            # tf.summary.image('b', b, 1)
 
         print('input', x.shape)
         print('z', z.shape)
         print('pool2', pool2.shape)
         print('pool3', pool3.shape)
-        print('pool4', feature_output.shape)
-        print('conv7', conv7.shape)
+        print('pool4', pool4.shape)
+        print('pool5', pool5.shape)
         print('fuse1', fuse1.shape)
         print('fuse2', fuse2.shape)
         print('output', output.shape)
 
         with tf.name_scope('matrix'):
+            
 
             # loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
             #     logits=output, labels=b_y))
@@ -181,7 +161,7 @@ def train():
             saver = tf.train.Saver()
             merged = tf.summary.merge_all()
 
-    with tf.Session(graph=feature_graph) as sess:
+    with tf.Session(graph=graph) as sess:
 
         train_writer = tf.summary.FileWriter(LOG_TRAIN_PATH, graph=sess.graph)
         tf.global_variables_initializer().run()
@@ -196,7 +176,6 @@ def train():
                 x_s, _ = dataset.next_batch(RANDOM_SEED, valid_set=True)
 
                 x_s, z_s = seg_pre_process(x_s)
-                y_s = np.zeros((x_s.shape[0], 3))
 
                 _, summary, b_loss = sess.run(
                     [optimizer, merged, loss],
