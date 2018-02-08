@@ -10,8 +10,8 @@ from data import data_input
 from data import process
 from data.process import seg_pre_process
 
-TOTAL_EPOCH = 3000
-BATCH_SIZE = 50
+TOTAL_EPOCH = 500
+BATCH_SIZE = 10
 LEARNING_RATE = 1e-4
 DROPOUT_RATE = 0.9
 RANDOM_SEED = np.random.randint(0, 1000)
@@ -128,13 +128,25 @@ def train():
             up_sample2 = tf.layers.conv2d_transpose(fuse2, 3, (3,3), strides=(2, 2), padding='same', activation=lrelu)
             up_pool2 = tf.layers.conv2d(pool2, 3, (3,3), strides=(1, 1), padding='same', activation=lrelu)
             fuse3 = tf.add(up_sample2, up_pool2)
-
             output = fuse3
-            
+            # pred = tf.argmax(output, dimension=3)
+
+        # with tf.variable_scope('post_processing'):
+        #     resh = tf.reshape(fuse3, (-1, 64*64, 3))
+        #     preds = []
+        #     for i in range(resh.shape[0]):
+        #         pred = tf.zeros_like(i)
+        #         pred[np.arange(len(i)), np.argmax(1)] = 1
+        #         preds.append(pred)
+
+        #     output=tf.stack(preds)
+
         with tf.name_scope('output'):
             tf.summary.image('up32', fuse1, 1)
             tf.summary.image('up16', fuse2, 1)
+            tf.summary.image('up8', fuse3, 1)
             tf.summary.image('output', output, 1)
+            # tf.summary.image('pred', pred, 1)
 
         print('input', x.shape)
         print('z', z.shape)
@@ -144,11 +156,11 @@ def train():
         print('pool5', pool5.shape)
         print('fuse1', fuse1.shape)
         print('fuse2', fuse2.shape)
+        print('fues3', fuse3.shape)
         print('output', output.shape)
 
         with tf.name_scope('matrix'):
             
-
             # loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
             #     logits=output, labels=b_y))
             loss = fcn_loss(output, b_y, 3)

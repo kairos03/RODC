@@ -12,6 +12,11 @@ from scipy import misc
 import numpy as np
 import pandas as pd
 import h5py
+import cv2
+
+from data.hb_process import get_roi
+from data.hb_process import get_nofcomp
+from data.hb_process import cvtColor
 
 
 DATA_PATH = 'data/seg_data/'
@@ -31,9 +36,9 @@ IMAGE_TRAIN_DATASET_PATH = DATA_PATH + 'image_train.h5'
 DETACTION_OBJECTS_PATH = DATA_PATH + 'objects/'
 DETACTION_TRAIN_DATASET_PATH = DATA_PATH + 'detation_train.h5'
 
-ORIGIN_PATH = DATA_PATH + 'image/'
-MASK_PATH = DATA_PATH + 'mask/'
-ANNO_PATH = DATA_PATH + 'anno/'
+ORIGIN_PATH = DATA_PATH + 'images/'
+MASK_PATH = DATA_PATH + 'labels/'
+ANNO_PATH = DATA_PATH + 'annos/'
 FCN_TRAIN_DATASET_PATH = DATA_PATH + 'fcn_train.h5'
 
 
@@ -171,28 +176,35 @@ def pre_process(image_names, path, size=256, interp='bilinear'):
 def remove_background(image, background):
     imgs = []
     for x in image:
-        diff = np.abs(background - x)
-        diff  = ((diff > 50) * 255.).astype(np.int8)
-        imgs.append(diff)
+        mask = np.abs(background - x)
+        mask  = (mask < 25)
+        np.place(x, mask, 255)
+        imgs.append(x)
     return np.stack(imgs)
     
 
-
 def seg_pre_process(image_names):
 
-    x = pre_process(image_names, [ORIGIN_PATH]*image_names.shape[0])
-    clean_img = misc.imread('data/seg_data/background/0000112.jpg')
+    images = pre_process(image_names, [ORIGIN_PATH]*image_names.shape[0])
+    clean_img = misc.imread('data/seg_data/clean.jpg')
     clean_img = misc.imresize(clean_img, (256,256))
-    x = remove_background(x, clean_img)
 
+    x = []
+    for img in images:
+        mask = get_roi(img, clean_img)
+        roi = cv2.bitwise_or(img, img, mask=mask)
+        # lab = cvtColor(mask, cv2.COLOR_GRAY2RGB)
+        x.append(roi)
+    
+    x = np.stack(x)
     y = pre_process(image_names, [ANNO_PATH]*image_names.shape[0], size=64, interp='nearest')
 
     return x, y
 
 
 if __name__ == '__main__':
-    make_image_train_dataset()
-    load_image_train_dataset()
+    # make_image_train_dataset()
+    # load_image_train_dataset()
 
     # make_detacion_train_dataset()
     # load_detacion_train_dataset()
