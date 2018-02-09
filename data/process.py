@@ -161,7 +161,8 @@ def pre_process(image_names, path, size=256, interp='bilinear'):
 
     for i, name in enumerate(image_names):
         
-        im = misc.imread(path[i] + name)
+        im = misc.imread(path + name)
+        print(path+name)
         im = misc.imresize(im, (size, size), interp=interp)
 
         imgs.append(im)
