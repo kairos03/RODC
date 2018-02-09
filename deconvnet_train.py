@@ -5,14 +5,16 @@ import tensorflow as tf
 import numpy as np
 from scipy import misc
 import matplotlib.pyplot as plt
+import cv2
 
 from data import data_input
 from data import process
 from data.process import seg_pre_process
+from data.hb_process import cvtColor
 
 TOTAL_EPOCH = 500
 BATCH_SIZE = 10
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 5e-5
 DROPOUT_RATE = 0.9
 RANDOM_SEED = np.random.randint(0, 1000)
 
@@ -57,7 +59,7 @@ def fcn_loss(logits, labels, num_classes, head=None):
 
         if head is not None:
             cross_entropy = -tf.reduce_sum(tf.multiply(labels * tf.log(softmax),
-                                           head), reduction_indices=[1])
+                                                       head), reduction_indices=[1])
         else:
             cross_entropy = -tf.reduce_sum(
                 labels * tf.log(softmax), reduction_indices=[1])
@@ -82,7 +84,7 @@ def train():
         # model
         with tf.name_scope('input'):
             x = tf.placeholder(tf.float32, [None, 256, 256, 3], name='x')
-            z = tf.placeholder(tf.float32, [None, 64, 64, 3], name='z')
+            z = tf.placeholder(tf.float32, [None, 128, 128, 3], name='z')
             keep_prob = tf.placeholder(tf.float16)
             b_y = tf.truediv(z, 255.)
 
@@ -91,44 +93,80 @@ def train():
 
         with tf.variable_scope('convolution'):
             conv = tf.layers.batch_normalization(x)
-            conv = tf.layers.conv2d(conv, 64, (3,3), strides=(1, 1), padding='same', activation=lrelu)
-            pool1 = tf.layers.max_pooling2d(conv, (2,2), (2,2), padding='same')
+            conv = tf.layers.conv2d(conv, 64, (3, 3), strides=(
+                1, 1), padding='same', activation=lrelu)
+            pool1 = tf.layers.max_pooling2d(
+                conv, (2, 2), (2, 2), padding='same')
 
             conv = tf.layers.batch_normalization(pool1)
-            conv = tf.layers.conv2d(conv, 128, (3,3), strides=(1, 1), padding='same', activation=lrelu)
-            pool2 = tf.layers.max_pooling2d(conv, (2,2), (2,2), padding='same')
+            conv = tf.layers.conv2d(conv, 128, (3, 3), strides=(
+                1, 1), padding='same', activation=lrelu)
+            pool2 = tf.layers.max_pooling2d(
+                conv, (2, 2), (2, 2), padding='same')
 
             conv = tf.layers.batch_normalization(pool2)
-            conv = tf.layers.conv2d(conv, 64, (1,1), strides=(1, 1), padding='same', activation=lrelu)
-            conv = tf.layers.conv2d(conv, 128, (3,3), strides=(1, 1), padding='same', activation=lrelu)
-            conv = tf.layers.conv2d(conv, 256, (3,3), strides=(1, 1), padding='same', activation=lrelu)
-            pool3 = tf.layers.max_pooling2d(conv, (2,2), (2,2), padding='same')
+            conv = tf.layers.conv2d(conv, 64, (1, 1), strides=(
+                1, 1), padding='same', activation=lrelu)
+            conv = tf.layers.conv2d(conv, 128, (3, 3), strides=(
+                1, 1), padding='same', activation=lrelu)
+            conv = tf.layers.conv2d(conv, 256, (3, 3), strides=(
+                1, 1), padding='same', activation=lrelu)
+            pool3 = tf.layers.max_pooling2d(
+                conv, (2, 2), (2, 2), padding='same')
 
             conv = tf.layers.batch_normalization(pool3)
-            conv = tf.layers.conv2d(conv, 128, (1,1), strides=(1, 1), padding='same', activation=lrelu)
-            conv = tf.layers.conv2d(conv, 256, (3,3), strides=(1, 1), padding='same', activation=lrelu)
-            conv = tf.layers.conv2d(conv, 512, (3,3), strides=(1, 1), padding='same', activation=lrelu)
-            pool4 = tf.layers.max_pooling2d(conv, (2,2), (2,2), padding='same')
+            conv = tf.layers.conv2d(conv, 128, (1, 1), strides=(
+                1, 1), padding='same', activation=lrelu)
+            conv = tf.layers.conv2d(conv, 256, (3, 3), strides=(
+                1, 1), padding='same', activation=lrelu)
+            conv = tf.layers.conv2d(conv, 512, (3, 3), strides=(
+                1, 1), padding='same', activation=lrelu)
+            pool4 = tf.layers.max_pooling2d(
+                conv, (2, 2), (2, 2), padding='same')
 
             conv = tf.layers.batch_normalization(pool4)
-            conv = tf.layers.conv2d(conv, 256, (1,1), strides=(1, 1), padding='same', activation=lrelu)
-            conv = tf.layers.conv2d(conv, 512, (3,3), strides=(1, 1), padding='same', activation=lrelu)
-            conv = tf.layers.conv2d(conv, 1024, (3,3), strides=(1, 1), padding='same', activation=lrelu)
-            pool5 = tf.layers.max_pooling2d(conv, (2,2), (2,2), padding='same')
+            conv = tf.layers.conv2d(conv, 256, (1, 1), strides=(
+                1, 1), padding='same', activation=lrelu)
+            conv = tf.layers.conv2d(conv, 512, (3, 3), strides=(
+                1, 1), padding='same', activation=lrelu)
+            conv = tf.layers.conv2d(conv, 1024, (3, 3), strides=(
+                1, 1), padding='same', activation=lrelu)
+            pool5 = tf.layers.max_pooling2d(
+                conv, (2, 2), (2, 2), padding='same')
 
         with tf.variable_scope('deconvolution'):
-            up_sample4 = tf.layers.conv2d_transpose(pool5, 3, (3,3), strides=(2, 2), padding='same', activation=lrelu)
-            up_pool4 = tf.layers.conv2d(pool4, 3, (3,3), strides=(1, 1), padding='same', activation=lrelu)
+            up_sample4 = tf.layers.conv2d_transpose(
+                pool5, 3, (5, 5), strides=(2, 2), padding='same', activation=lrelu)
+            up_sample4 = tf.layers.conv2d_transpose(
+                up_sample4, 3, (3, 3), strides=(1, 1), padding='same', activation=lrelu)
+            up_pool4 = tf.layers.conv2d(pool4, 3, (3, 3), strides=(
+                1, 1), padding='same', activation=lrelu)
             fuse1 = tf.add(up_sample4, up_pool4)
-            
-            up_sample3 = tf.layers.conv2d_transpose(fuse1, 3, (3,3), strides=(2, 2), padding='same', activation=lrelu)
-            up_pool3 = tf.layers.conv2d(pool3, 3, (3,3), strides=(1, 1), padding='same', activation=lrelu)
+
+            up_sample3 = tf.layers.conv2d_transpose(
+                fuse1, 3, (5, 5), strides=(2, 2), padding='same', activation=lrelu)
+            up_sample3 = tf.layers.conv2d_transpose(
+                up_sample3, 3, (3, 3), strides=(1, 1), padding='same', activation=lrelu)
+            up_pool3 = tf.layers.conv2d(pool3, 3, (3, 3), strides=(
+                1, 1), padding='same', activation=lrelu)
             fuse2 = tf.add(up_sample3, up_pool3)
 
-            up_sample2 = tf.layers.conv2d_transpose(fuse2, 3, (3,3), strides=(2, 2), padding='same', activation=lrelu)
-            up_pool2 = tf.layers.conv2d(pool2, 3, (3,3), strides=(1, 1), padding='same', activation=lrelu)
+            up_sample2 = tf.layers.conv2d_transpose(
+                fuse2, 3, (5, 5), strides=(2, 2), padding='same', activation=lrelu)
+            up_sample2 = tf.layers.conv2d_transpose(
+                up_sample2, 3, (5, 5), strides=(1, 1), padding='same', activation=lrelu)
+            up_pool2 = tf.layers.conv2d(pool2, 3, (3, 3), strides=(
+                1, 1), padding='same', activation=lrelu)
             fuse3 = tf.add(up_sample2, up_pool2)
-            output = fuse3
+
+            up_sample1 = tf.layers.conv2d_transpose(
+                fuse3, 3, (5, 5), strides=(2, 2), padding='same', activation=lrelu)
+            up_sample1 = tf.layers.conv2d_transpose(
+                up_sample1, 3, (5, 5), strides=(1, 1), padding='same', activation=lrelu)
+            up_pool1 = tf.layers.conv2d(pool1, 3, (3, 3), strides=(
+                1, 1), padding='same', activation=lrelu)
+            fuse4 = tf.add(up_sample1, up_pool1)
+            output = fuse4
             # pred = tf.argmax(output, dimension=3)
 
         # with tf.variable_scope('post_processing'):
@@ -142,10 +180,10 @@ def train():
         #     output=tf.stack(preds)
 
         with tf.name_scope('output'):
-            tf.summary.image('up32', fuse1, 1)
-            tf.summary.image('up16', fuse2, 1)
-            tf.summary.image('up8', fuse3, 1)
             tf.summary.image('output', output, 1)
+            tf.summary.image('particle', tf.image.grayscale_to_rgb(tf.expand_dims(output[:, :, :, 0],-1)), 1)
+            tf.summary.image('peptide', tf.image.grayscale_to_rgb(tf.expand_dims(output[:, :, :, 1],-1)), 1)
+            tf.summary.image('background', tf.image.grayscale_to_rgb(tf.expand_dims(output[:, :, :, 2],-1)), 1)
             # tf.summary.image('pred', pred, 1)
 
         print('input', x.shape)
@@ -160,15 +198,24 @@ def train():
         print('output', output.shape)
 
         with tf.name_scope('matrix'):
-            
+
             # loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
             #     logits=output, labels=b_y))
             loss = fcn_loss(output, b_y, 3)
 
             optimizer = tf.train.AdamOptimizer(LEARNING_RATE).minimize(loss)
 
+            # re_out = tf.reshape(output, (-1, 3))
+            # re_y = tf.reshape(b_y, (-1, 3))
+
+            # print(tf.argmax(re_out, 1).get_shape())
+            # print(tf.argmax(re_y, 1).get_shape())
+
+            # accuracy = tf.cast(tf.equal(tf.argmax(output, 3), tf.argmax(b_y, 3)), tf.float32)
+
             tf.summary.scalar('loss', loss)
             tf.summary.scalar('learning_rate', LEARNING_RATE)
+            # tf.summary.scalar('accuracy', accuracy)
 
             saver = tf.train.Saver()
             merged = tf.summary.merge_all()

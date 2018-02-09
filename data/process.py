@@ -197,10 +197,10 @@ def seg_pre_process(image_names):
         x.append(roi)
     
     x = np.stack(x)
-    y = pre_process(image_names, [ANNO_PATH]*image_names.shape[0], size=64, interp='nearest')
+    y = pre_process(image_names, [ANNO_PATH]*image_names.shape[0], size=128, interp='nearest')
 
     return x, y
-
+    
 
 if __name__ == '__main__':
     # make_image_train_dataset()
