@@ -4,8 +4,8 @@
 **/*.zip
 **/*.h5
 **/*.xml
-log/
 **/*.pptx
+log/
 
 .vscode/
 
