@@ -133,6 +133,7 @@ def image_to_anno(img, width=256, height=256):
 def make_fcn_train_dataset(path=FCN_TRAIN_DATASET_PATH):
     df = pd.DataFrame()
     filenames = np.array(os.listdir(ORIGIN_PATH))
+    print(filenames)
     df['filename'] = filenames
 
     # label to anno_img

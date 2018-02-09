@@ -5,10 +5,12 @@ import tensorflow as tf
 import numpy as np
 from scipy import misc
 import matplotlib.pyplot as plt
+from tensorflow.python.util import freeze
 
 from data import data_input
 from data import process
 from data.process import seg_pre_process
+
 
 
 TOTAL_EPOCH = 10000
@@ -41,59 +43,45 @@ def train():
     """
 
     print('-----  training start  -----')
+    # feature = None
 
-    with tf.Graph().as_default() as train_g:
+    # if feature == None:
+    with tf.Graph().as_default() as train_g2:
+        #with tf.name_scope('re_feature'):
+
+        # conv 
+        saver = tf.train.import_meta_graph('/home/kairos03/RODC/log/feature_model2/model/-100.meta')
+        # saver.restore(sess, tf.train.latest_checkpoint('/home/kairos03/RODC/log/feature_model2/model/'))
+
+        graph = tf.get_default_graph()
+        pool1 = graph.get_tensor_by_name('pool1/MaxPool:0')
+        pool2 = graph.get_tensor_by_name('pool2/MaxPool:0')
+        pool3 = graph.get_tensor_by_name('pool3/MaxPool:0')
+        # print(pool3)
+
         # model
         with tf.name_scope('input'):
-            x = tf.placeholder(tf.float32, [None, 256, 256, 3], name='x')
+            x = graph.get_tensor_by_name('input/x:0')
             y = tf.placeholder(tf.float32, [None, 256, 256, 3], name='y')
-            keep_prob = tf.placeholder(tf.float32, name='keep_prob')
+            keep_prob = graph.get_tensor_by_name('input/keep_prob:0')
 
             tf.summary.image('input', x, 1)
             tf.summary.image('label', y, 1)
 
             zero = np.zeros((1, 256, 256, 1))
-            r = tf.concat([tf.reshape(y[0,:,:,0], (1,256,256,1)), zero, zero], axis=3)
+            '''r = tf.concat([tf.reshape(y[0,:,:,0], (1,256,256,1)), zero, zero], axis=3)
             g = tf.concat([zero, tf.reshape(y[0,:,:,1], (1,256,256,1)), zero], axis=3)
             b = tf.concat([zero, zero, tf.reshape(y[0,:,:,2], (1,256,256,1))], axis=3)
 
             tf.summary.image('r', r, 1)
             tf.summary.image('g', g, 1)
-            tf.summary.image('b', b, 1)
+            tf.summary.image('b', b, 1)'''
 
             b_y = tf.truediv(y, 255.)
-
-        # conv
-        with tf.variable_scope('conv1'):
-            bn = tf.layers.batch_normalization(x)
-            conv1_1 = tf.layers.conv2d(bn, 64, kernel_size=[1, 1], padding='same', activation=lrelu)
-            conv1_2 = tf.layers.conv2d(conv1_1, 64, kernel_size=[5, 5], padding='same', activation=lrelu)
-            pool1 = tf.layers.average_pooling2d(conv1_2, pool_size=[2, 2], strides=[2, 2])
-
-        with tf.variable_scope('conv2'):
-            bn = tf.layers.batch_normalization(pool1)
-            conv2_1 = tf.layers.conv2d(bn, 128, kernel_size=[1, 1], padding='same', activation=lrelu)
-            conv2_2 = tf.layers.conv2d(conv2_1, 128, kernel_size=[5, 5], padding='same', activation=lrelu)
-            pool2 = tf.layers.average_pooling2d(conv2_2, pool_size=[2, 2], strides=[2, 2])
-
-        with tf.variable_scope('conv3'):
-            bn = tf.layers.batch_normalization(pool2)
-            conv3_1 = tf.layers.conv2d(bn, 128, kernel_size=[1, 1], padding='same', activation=lrelu)
-            conv3_2 = tf.layers.conv2d(bn, 256, kernel_size=[3, 3], padding='same', activation=lrelu)
-            plus = tf.concat([conv3_1, conv3_2], axis=3)
-            conv3_3 = tf.layers.conv2d(plus, 386, kernel_size=[3, 3], padding='same', activation=lrelu)
-            pool3 = tf.layers.average_pooling2d(conv3_3, pool_size=[2, 2], strides=[2, 2])
-
-        with tf.variable_scope('conv4'):
-            bn = tf.layers.batch_normalization(pool3)
-            conv4_1 = tf.layers.conv2d(bn, 386, kernel_size=[1, 1], padding='same', activation=lrelu)
-            conv4_2 = tf.layers.conv2d(bn, 512, kernel_size=[3, 3], padding='same', activation=lrelu)
-            plus = tf.concat([conv4_1, conv4_2], axis=3)
-            conv4_3 = tf.layers.conv2d(plus, 898, kernel_size=[3, 3], padding='same', activation=lrelu)
-            pool4 = tf.layers.average_pooling2d(conv4_3, pool_size=[2, 2], strides=[2, 2])
+            
 
         with tf.variable_scope('fcn'):
-            conv5 = tf.layers.conv2d(pool4, 2048, kernel_size=[1, 1], padding='same', activation=lrelu)
+            conv5 = tf.layers.conv2d(pool3, 2048, kernel_size=[1, 1], padding='same', activation=lrelu)
             drop1 = tf.layers.dropout(conv5, keep_prob)
             conv6 = tf.layers.conv2d(drop1, 2048, kernel_size=[1, 1], padding='same', activation=lrelu)
             drop2 = tf.layers.dropout(conv6, keep_prob)
@@ -102,20 +90,24 @@ def train():
         # deconv
         bn = tf.layers.batch_normalization(conv7)
         deconv1 = tf.layers.conv2d_transpose(bn, 386, kernel_size=[4, 4], strides=[2, 2], padding='same', activation=lrelu)
-
-        fuse1 = tf.add(deconv1, pool3)
+        reshape = tf.reshape(pool3, [-1, 16,16,386])
+        fuse1 = tf.add(deconv1, reshape)
 
         bn = tf.layers.batch_normalization(fuse1)
         deconv2 = tf.layers.conv2d_transpose(bn, 128, kernel_size=[4, 4], strides=[2, 2], padding='same', activation=lrelu)
-
+        reshape = tf.reshape(pool2, [-1, 32,32,128])
+<<<<<<< Updated upstream
+        fuse2 = tf.add(deconv2, reshape)
+=======
         fuse2 = tf.add(deconv2, pool2)
+>>>>>>> Stashed changes
 
         bn = tf.layers.batch_normalization(fuse2)
         output = tf.layers.conv2d_transpose(bn, 3, kernel_size=[8, 8], strides=[4, 4], padding='same', activation=lrelu)
 
 
         with tf.name_scope('output'):
-            zero = np.zeros((1, 256, 256, 1))
+            '''zero = np.zeros((1, 256, 256, 1))
             r = tf.concat([tf.reshape(output[0,:,:,0], (1,256,256,1)), zero, zero], axis=3)
             g = tf.concat([zero, tf.reshape(output[0,:,:,1], (1,256,256,1)), zero], axis=3)
             b = tf.concat([zero, zero, tf.reshape(output[0,:,:,2], (1,256,256,1))], axis=3)
@@ -123,7 +115,7 @@ def train():
             tf.summary.image('output', output, 1)
             tf.summary.image('r', r, 1)
             tf.summary.image('g', g, 1)
-            tf.summary.image('b', b, 1)
+            tf.summary.image('b', b, 1)'''
 
         print('input', x.shape)
         print('pool1', pool1.shape)
@@ -137,13 +129,15 @@ def train():
 
         with tf.name_scope('matrix'):
             
-            r_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=output[:,:,:,0], labels=tf.stop_gradient(b_y[:,:,:,0]))
-            g_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=output[:,:,:,1], labels=tf.stop_gradient(b_y[:,:,:,1]))
-            b_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=output[:,:,:,2], labels=tf.stop_gradient(b_y[:,:,:,2]))
+            # r_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=output[:,:,:,0], labels=tf.stop_gradient(b_y[:,:,:,0]))
+            # g_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=output[:,:,:,1], labels=tf.stop_gradient(b_y[:,:,:,1]))
+            # b_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=output[:,:,:,2], labels=tf.stop_gradient(b_y[:,:,:,2]))
 
-            loss = 5*r_loss + 5*g_loss + 1*b_loss
-            loss = .5 * tf.reduce_mean(loss , name='loss')
+            # loss = 5*r_loss + 5*g_loss + 1*b_loss
+            # loss = .5 * tf.reduce_mean(loss , name='loss')
             # loss = tf.reduce_mean(g_loss)
+            loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
+                logits=output, labels=tf.stop_gradient(y)), name='loss')
             optimizer = tf.train.AdamOptimizer(LEARNING_RATE).minimize(loss)
 
             tf.summary.scalar('loss', loss)
@@ -151,11 +145,19 @@ def train():
 
             saver = tf.train.Saver()
             merged = tf.summary.merge_all()
+            
+<<<<<<< Updated upstream
+            
+=======
+>>>>>>> Stashed changes
+            #sess.close()
 
-    with tf.Session(graph=train_g) as sess:
+    with tf.Session(graph=train_g2) as sess:
 
         train_writer = tf.summary.FileWriter(LOG_TRAIN_PATH, graph=sess.graph)
         tf.global_variables_initializer().run()
+
+        tf.variables_initializer([x, ]).run()
 
         total_batch = dataset.total_batch
 
@@ -212,7 +214,7 @@ def test():
         # place holder
         x = graph.get_tensor_by_name('input/x:0')
         y = graph.get_tensor_by_name('input/y:0')
-        keep_porb = graph.get_tensor_by_name('input/keep_prob:0')
+        keep_prob = graph.get_tensor_by_name('input/keep_prob:0')
 
         loss = graph.get_tensor_by_name('matrix/loss:0')
         # loss = sess.run('matrix/loss:0')
@@ -223,7 +225,7 @@ def test():
 
             xent = sess.run(loss, feed_dict={x: x_s,
                                              y: y_s,
-                                             keep_porb: 1.0})
+                                             keep_prob: 1.0})
             total_loss += xent
 
         print("TEST LOSS: %.5f" % (total_loss / dataset.valid_total_batch))

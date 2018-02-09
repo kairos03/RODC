@@ -2,25 +2,37 @@
 # implement : https://arxiv.org/pdf/1506.02640.pdf
 import tensorflow as tf
 import os
+import sys
 import numpy as np
+import tf_fcn_8 as fcn8
+import loss
+import time
+
+from data import data_input
+from data import process
+from data.process import seg_pre_process
 
 # model ingredients
 # parameter
-LR = 1e-3
-RANDOM_SEED = np.random.randint(0, high=1000, size=1)
+TOTAL_EPOCH = 10000
+BATCH_SIZE = 50
+LEARNING_RATE = 1e-4
+DROPOUT_RATE = 0.9
+RANDOM_SEED = np.random.randint(0, 1000)
 
-# tensorboard
-'''
-def var_summary(var):
-    """ weight variable summary
-    """
-    with tf.name_scope('summary'):
-        tf.summary.histogram('histogram', var)
-        mean = tf.reduce_mean(var)
-        tf.summary.scalar('mean', mean)
-        stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
-        tf.summary.scalar('stddev', stddev)
-'''
+CURRENT = time.time()
+LOG_TRAIN_PATH = 'log/' + str(CURRENT) + '/train/'
+LOG_TEST_PATH = 'log/' + str(CURRENT) + '/test/'
+MODEL_PATH = 'log/' + str(CURRENT) + '/model/'
+
+df = process.load_fcn_train_dataset()
+dataset = data_input.get_dataset(BATCH_SIZE, np.array(df['filename']),
+                                 None, is_shuffle=True, is_valid=True)
+
+n_classes = 3
+input_shape = (256, 256)
+label_shape = (256, 256)
+deconv_weight = 2
 
 # leaky Relu function
 def lrelu(x, alpa = 0.1):
@@ -94,9 +106,61 @@ def RODC_model(pre_x, Y, keep_prob):
 
     return output, x_ent, opt, accuracy
 
-
-
+def train():
     
+    vgg8 = fcn8.FCN8VGG(vgg16_npy_path='/home/mike2ox/RODC/data/vgg16.npy')
+    x = tf.placeholder(tf.float32, [None, 256, 256, 3], name='x')
+    y = tf.placeholder(tf.float32, [None, 256, 256, 3], name='y')
 
-    
+    vgg8.build(x, True, num_classes=3)
+    vgg_loss = loss.loss(logits=vgg8.pred_up, labels=y, num_classes=3)
+    print(vgg_loss)
+    ## optimizer = tf.train.AdamOptimizer(LEARNING_RATE).minimize(vgg_loss)
 
+    tf.summary.scalar('loss', vgg_loss)
+    tf.summary.scalar('learning_rate', LEARNING_RATE)
+
+    saver = tf.train.Saver()
+    merged = tf.summary.merge_all()
+
+    with tf.Session() as sess:
+        train_writer = tf.summary.FileWriter(LOG_TRAIN_PATH, graph=sess.graph)
+        tf.global_variables_initializer().run()
+
+        # tf.variables_initializer([x, ]).run()
+
+        total_batch = dataset.total_batch
+
+        for epoch in range(TOTAL_EPOCH):
+            ep_loss = 0
+
+            for _ in range(total_batch):
+
+                x_s, _ = dataset.next_batch(RANDOM_SEED, valid_set=True)
+
+                x_s, y_s = seg_pre_process(x_s)
+
+                summary, b_loss = sess.run(
+                    [merged, vgg_loss],
+                    feed_dict={
+                        x: x_s,
+                        y: y_s,
+                    })
+
+                ep_loss += b_loss
+
+            train_writer.add_summary(summary, global_step=epoch)
+
+            if epoch == 0 or epoch % 10 == 9:
+                print("[EP %3d] loss: %.5f" %
+                      (epoch, ep_loss / total_batch))
+                saver.save(sess, MODEL_PATH, global_step=epoch)
+
+        # final save
+        saver.save(sess, MODEL_PATH, global_step=TOTAL_EPOCH)
+
+    print('-----  training end  -----')
+
+if __name__ == '__main__':
+
+    train()

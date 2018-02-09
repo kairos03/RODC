@@ -2,6 +2,13 @@
 import numpy as np
 import tensorflow as tf
 import pandas as pd
+import RODC_CNN
+import time
+
+CURRENT = time.time()
+LOG_TRAIN_PATH = 'log/' + str(CURRENT) + 'model2/train/'
+LOG_TEST_PATH = 'log/' + str(CURRENT) + 'model2/test/'
+MODEL_PATH = 'log/' + str(CURRENT) + '/model/2'
 
 # 격자수, 경계 박스수, class 종류(peptide, cylinder)
 def get_pic_info(Sector=5, n_box=2, n_class=2):
@@ -12,7 +19,7 @@ def get_pic_info(Sector=5, n_box=2, n_class=2):
 
 # 데이터 전처리에서 넘어온 5*5*12 데이터들을 
 # def load_from_data():
-'''ㅔ
+'''
 def loss(data):
     S, B, C = get_pic_info()
     SS = S*S # number of grid cells
@@ -21,7 +28,7 @@ def loss(data):
     box_X = tf.placeholder(tf.float32, [None, 2])
     box_y = tf.placeholder(tf.float32, [None, 2])
 '''
-
+'''
 # kairos/detection_model.py 의 inner function로 넘겨줘야함.
 def creat_batch():
     meta = pd.read_hdf("data.h5") # h5 파일 경로 edit
@@ -52,7 +59,23 @@ def creat_batch():
     coord = np.zeros([SS,B,4]) # x,y,w,h
     proid = np.zeros([SS,C]) # 
     prear = np.zeros([SS,4]) # 
+    '''
 
 
+def train(total_epoch, batch_size):
+    '''
+    RODC CNN model train
+    '''
 
-        
+    print('--------- training start ---------')
+
+    with tf.Sesstion() as sess:
+        tf.global_variables_initializer().run()
+        write = tf.summary.FileWriter(LOG_TRAIN_PATH, sess.graph)
+
+        for epoch in range(total_epoch):
+            total_cost = 0
+            for i in range(batch_size):
+                batch_xs, batch_ys = RODC_CNN.next_batch()
+
+

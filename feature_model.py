@@ -64,7 +64,11 @@ def make_model(inputs, hparam):
     print(pool1.shape)
     print(pool2.shape)
     print(pool3.shape)
+<<<<<<< Updated upstream
     print(pool4.shape)
+=======
+    print(pool3)
+>>>>>>> Stashed changes
 
     reshape = tf.reshape(pool4, (-1, 4 * 4 * 1024))
 
