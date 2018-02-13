@@ -12,10 +12,10 @@ from data import process
 from data.process import seg_pre_process
 from data.hb_process import cvtColor
 
-TOTAL_EPOCH = 500
-BATCH_SIZE = 15
+TOTAL_EPOCH = 800
+BATCH_SIZE = 20
 LEARNING_RATE = 6e-5
-DROPOUT_RATE = 0.8
+DROPOUT_RATE = 0.9
 RANDOM_SEED = np.random.randint(0, 1000)
 
 CURRENT = time.time()
@@ -212,11 +212,11 @@ def train():
             # print(tf.argmax(re_out, 1).get_shape())
             # print(tf.argmax(re_y, 1).get_shape())
 
-            # accuracy = tf.cast(tf.equal(tf.argmax(output, 3), tf.argmax(b_y, 3)), tf.float32)
+            accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(output, 3), tf.argmax(b_y, 3)), tf.float32))
 
             tf.summary.scalar('loss', loss)
             tf.summary.scalar('learning_rate', LEARNING_RATE)
-            # tf.summary.scalar('accuracy', accuracy)
+            tf.summary.scalar('accuracy', accuracy)
 
             saver = tf.train.Saver()
             merged = tf.summary.merge_all()
@@ -237,8 +237,8 @@ def train():
 
                 x_s, z_s = seg_pre_process(x_s)
 
-                _, summary, b_loss = sess.run(
-                    [optimizer, merged, loss],
+                _, summary, b_loss, _ = sess.run(
+                    [optimizer, merged, loss, accuracy],
                     feed_dict={
                         x: x_s,
                         # y: y_s,
