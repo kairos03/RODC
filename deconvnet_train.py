@@ -13,15 +13,16 @@ from data.process import seg_pre_process
 from data.hb_process import cvtColor
 
 TOTAL_EPOCH = 500
-BATCH_SIZE = 10
-LEARNING_RATE = 5e-5
-DROPOUT_RATE = 0.9
+BATCH_SIZE = 15
+LEARNING_RATE = 6e-5
+DROPOUT_RATE = 0.8
 RANDOM_SEED = np.random.randint(0, 1000)
 
 CURRENT = time.time()
-LOG_TRAIN_PATH = 'log/' + str(CURRENT) + '/train/'
-LOG_TEST_PATH = 'log/' + str(CURRENT) + '/test/'
-MODEL_PATH = 'log/' + str(CURRENT) + '/model/'
+H_PRA = 'lr:{}_epoch:{}_batch:{}' .format(LEARNING_RATE, TOTAL_EPOCH, BATCH_SIZE)
+LOG_TRAIN_PATH = 'log/' + str(CURRENT) + H_PRA + '/train/'
+LOG_TEST_PATH = 'log/' + str(CURRENT) + H_PRA +'/test/'
+MODEL_PATH = 'log/' + str(CURRENT) + H_PRA +'/model/'
 
 df = process.load_fcn_train_dataset()
 dataset = data_input.get_dataset(BATCH_SIZE, np.array(df['filename']),
