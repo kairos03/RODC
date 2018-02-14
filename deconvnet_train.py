@@ -13,7 +13,7 @@ from data.process import seg_pre_process
 from data.hb_process import cvtColor
 
 TOTAL_EPOCH = 800
-BATCH_SIZE = 20
+BATCH_SIZE = 32
 LEARNING_RATE = 6e-5
 DROPOUT_RATE = 0.9
 RANDOM_SEED = np.random.randint(0, 1000)
@@ -71,7 +71,22 @@ def fcn_loss(logits, labels, num_classes, head=None):
 
         loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
     return loss
+def Px_IOU(logits, labels):
+    """
+    custom intersection over Union
+    """
+    # create probability area
+    logits = tf.reshape(logits, [-1])
+    labels = tf.reshape(labels, [-1])
 
+    intersect = tf.reduce_sum(tf.mul(logits, labels))
+
+    union = tf.reduce_sum(tf.sub(tf.add(logits, labels), tf.mul(logits,labels)))
+
+    iou = tf.div(intersect, union)
+    # px_loss = tf.sub(tf.constant(1.0, dtype=tf.float32),tf.div(intersect, union))
+
+    return iou
 
 def train():
     """
@@ -203,7 +218,7 @@ def train():
             # loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
             #     logits=output, labels=b_y))
             loss = fcn_loss(output, b_y, 3)
-
+            px_iou = Px_IOU(output, b_y)
             optimizer = tf.train.AdamOptimizer(LEARNING_RATE).minimize(loss)
 
             # re_out = tf.reshape(output, (-1, 3))
@@ -217,7 +232,7 @@ def train():
             tf.summary.scalar('loss', loss)
             tf.summary.scalar('learning_rate', LEARNING_RATE)
             tf.summary.scalar('accuracy', accuracy)
-
+            tf.summary.scalar('px_iou', px_iou)
             saver = tf.train.Saver()
             merged = tf.summary.merge_all()
 
@@ -237,8 +252,8 @@ def train():
 
                 x_s, z_s = seg_pre_process(x_s)
 
-                _, summary, b_loss, _ = sess.run(
-                    [optimizer, merged, loss, accuracy],
+                _, summary, b_loss, _, _ = sess.run(
+                    [optimizer, merged, loss, accuracy, px_iou],
                     feed_dict={
                         x: x_s,
                         # y: y_s,
