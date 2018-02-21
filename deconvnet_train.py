@@ -10,6 +10,7 @@ import cv2
 from data import data_input
 from data import process
 from data.process import seg_pre_process
+from data.process import pre_process
 from data.hb_process import cvtColor
 
 TOTAL_EPOCH = 800
@@ -20,9 +21,13 @@ RANDOM_SEED = np.random.randint(0, 1000)
 
 CURRENT = time.time()
 H_PRA = 'lr:{}_epoch:{}_batch:{}' .format(LEARNING_RATE, TOTAL_EPOCH, BATCH_SIZE)
-LOG_TRAIN_PATH = 'log/' + str(CURRENT) + H_PRA + '/train/'
-LOG_TEST_PATH = 'log/' + str(CURRENT) + H_PRA +'/test/'
-MODEL_PATH = 'log/' + str(CURRENT) + H_PRA +'/model/'
+LOG_TRAIN_PATH = 'log/deconvnet' + str(CURRENT) + H_PRA + '/train/'
+LOG_TEST_PATH = 'log/deconvnet' + str(CURRENT) + H_PRA +'/test/'
+MODEL_PATH = 'log/deconvnet' + str(CURRENT) + H_PRA +'/model/'
+
+DATA_PATH = 'data/seg_data/'
+ORIGIN_PATH = DATA_PATH + 'images/'
+
 
 df = process.load_fcn_train_dataset()
 dataset = data_input.get_dataset(BATCH_SIZE, np.array(df['filename']),
@@ -79,9 +84,9 @@ def Px_IOU(logits, labels):
     logits = tf.reshape(logits, [-1])
     labels = tf.reshape(labels, [-1])
 
-    intersect = tf.reduce_sum(tf.mul(logits, labels))
+    intersect = tf.reduce_sum(tf.multiply(logits, labels))
 
-    union = tf.reduce_sum(tf.sub(tf.add(logits, labels), tf.mul(logits,labels)))
+    union = tf.reduce_sum(tf.subtract(tf.add(logits, labels), tf.multiply(logits,labels)))
 
     iou = tf.div(intersect, union)
     # px_loss = tf.sub(tf.constant(1.0, dtype=tf.float32),tf.div(intersect, union))
@@ -101,7 +106,7 @@ def train():
         with tf.name_scope('input'):
             x = tf.placeholder(tf.float32, [None, 256, 256, 3], name='x')
             z = tf.placeholder(tf.float32, [None, 128, 128, 3], name='z')
-            keep_prob = tf.placeholder(tf.float16)
+            keep_prob = tf.placeholder(tf.float16, name='keep_prob')
             b_y = tf.truediv(z, 255.)
 
             tf.summary.image('input', x, 1)
@@ -181,6 +186,7 @@ def train():
                 up_sample1, 3, (5, 5), strides=(1, 1), padding='same', activation=lrelu)
             up_pool1 = tf.layers.conv2d(pool1, 3, (3, 3), strides=(
                 1, 1), padding='same', activation=lrelu)
+            
             fuse4 = tf.add(up_sample1, up_pool1)
             output = fuse4
             # pred = tf.argmax(output, dimension=3)
@@ -280,26 +286,27 @@ def test():
     """
     model test
     """
+    z = tf.placeholder(tf.float32, [None,  3], name='z')
 
     print('-----  test start  -----')
 
     x_s, y_s = dataset.next_batch(RANDOM_SEED, valid_set=True)
-    x_s, y_s = pre_process(x_s)
-
+    x_s = pre_process(x_s, [ORIGIN_PATH]*x_s.shape[0])
+    
     tf.reset_default_graph()
     saver = tf.train.import_meta_graph(
-        MODEL_PATH + '-' + str(TOTAL_EPOCH) + '.meta')
+        'log/090218_bestcase/model/-700.meta')
 
     with tf.Session() as sess:
-        saver.restore(sess, tf.train.latest_checkpoint(MODEL_PATH))
+        saver.restore(sess, tf.train.latest_checkpoint('log/090218_bestcase/model/'))
         graph = tf.get_default_graph()
 
         # place holder
         x = graph.get_tensor_by_name('input/x:0')
-        y = graph.get_tensor_by_name('input/y:0')
-        keep_porb = graph.get_tensor_by_name('input/keep_prob:0')
+        z = graph.get_tensor_by_name('input/z:0')
+        # keep_prob = graph.get_tensor_by_name('input/keep_prob:0')
 
-        loss = graph.get_tensor_by_name('matrix/loss:0')
+        loss = graph.get_tensor_by_name('matrix/loss/total_loss:0')
         # loss = sess.run('matrix/loss:0')
 
         total_loss = 0
@@ -307,8 +314,7 @@ def test():
         for batch in range(dataset.valid_total_batch):
 
             xent = sess.run(loss, feed_dict={x: x_s,
-                                             z: y_s,
-                                             keep_porb: 1.0})
+                                             z: y_s})
             total_loss += xent
 
         print("TEST LOSS: %.5f" % (total_loss / dataset.valid_total_batch))
@@ -318,4 +324,4 @@ def test():
 if __name__ == '__main__':
 
     train()
-    test()
+    # test()
